@@ -70,3 +70,24 @@ Insight
 
 Compared to v1 (single-pass fused kernel), v2 uses a two-pass approach (stats pass + normalize pass), increasing global memory traffic (reading x twice).
 Since LayerNorm is memory-bandwidth bound, the additional memory reads reduce achievable speedup despite improved generality.
+
+day5 
+Results (RTX 3060 Laptop)
+
+We benchmarked PyTorch LayerNorm vs Triton LayerNorm with shape-based dispatch:
+
+fast_v1: single-pass fused kernel optimized for power-of-two hidden sizes (N ≤ 8192)
+
+general_v2: two-pass kernel supporting arbitrary N
+
+Shape (M,N)	PyTorch (ms)	Triton (ms)	Speedup	Path
+(4096, 1024)	0.400	0.261	1.54×	fast_v1
+(4096, 4096)	1.888	1.109	1.70×	fast_v1
+(4096, 8192)	4.005	2.322	1.72×	fast_v1
+(8192, 4096)	3.935	2.247	1.75×	fast_v1
+(4096, 5000)	2.682	2.893	0.93×	general_v2
+Key Insight
+
+LayerNorm is primarily memory-bandwidth bound. The single-pass fused kernel reduces global memory traffic and achieves up to 1.75× speedup on power-of-two hidden sizes. For non-power-of-two sizes, the general two-pass kernel introduces additional memory reads and masked tail inefficiency, making it slower than PyTorch in some cases. Therefore, we use a fast-path specialization + general fallback design.
+
+![alt text](image.png)
